@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 const methodOverride = require('method-override');
 const port = 3000;
 
+//mengimport file errorHandler
+const errorHandler = require('./errorHandler');
+
 // MODELS //panggil model yang telah di exports
 const Product = require("./models/product");
 
@@ -22,6 +25,13 @@ app.use(express.urlencoded({extended: true}));
 
 //mengaktifkan method override
 app.use(methodOverride("_method"));
+
+//membuat blueprint untuk try and catch handling error
+function wrapAsync(fn) {
+    return function(req,res,next) {
+        fn(req,res,next).catch(err => next(err))
+    }
+}
 
 //ROUTE
 app.get('/', (req,res) => {
@@ -58,8 +68,9 @@ app.get('/product', async (req,res) => {
 });
 
 //Route untuk menampilkan form input atau create
-app.get("/product/create", async (req,res) => {
-    res.render("products/create.ejs");
+app.get("/product/create", (req,res) => {
+    throw new errorHandler("This is custom error", 503);
+    // res.render("products/create.ejs");
 })
 
 //Route untuk simpan data yang telah di input
@@ -69,38 +80,66 @@ app.post("/product", async (req,res) => {
     res.redirect(`/product/${product.id}`);
 })
 
-//Route untuk menampilkan detail product
-app.get("/product/:id", async (req,res) => {
-    const {id} = req.params
-    const product = await Product.findById(id);
-    res.render("products/show.ejs", {
-        product: product
-    });
-});
+//Route untuk menampilkan detail product cara pertama menggunakan function wrapAsync yang telah di buat di atas
+app.get("/product/:id", wrapAsync(async (req,res,next) => {
+        const {id} = req.params
+        const product = await Product.findById(id);
+        res.render("products/show.ejs", {
+            product: product
+        });
+}));
 
-//Route untuk menampilka halaman edit
-app.get("/product/:id/edit", async (req,res) => {
-    const {id} = req.params
-    const product = await Product.findById(id);
-    res.render("products/edit.ejs", {
-        product: product
-    });
-})
+//Route untuk menampilkan detail product cara kedua yang menggunakan try and catch secara langsung
+// app.get("/product/:id", async (req,res,next) => {
+//     //menggunakan try and catch untuk menampilkan error handler
+//     //jikalau benar, lanjutkan proses
+//     try {
+//         const {id} = req.params
+//         const product = await Product.findById(id);
+//         res.render("products/show.ejs", {
+//             product: product
+//         });
+//     //jikalau gagal lanjutkan atau next ke route errorHandler di paling bawah
+//     } catch (error) {
+//         next(new errorHandler("Produk tidak di temukan", 404))
+//     }
+// });
+
+//Route untuk menampilkan halaman edit
+app.get("/product/:id/edit", wrapAsync(async (req,res,next) => {
+        const {id} = req.params
+        const product = await Product.findById(id);
+        res.render("products/edit.ejs", {
+            product: product
+        });
+}));
 
 //Route untuk update produk
-app.put("/product/:id", async (req,res) => {
-    const {id} = req.params
-    const product = await Product.findByIdAndUpdate(id, req.body, {runValidators: true});
-    res.redirect(`/product/${product.id}`)
-})
+app.put("/product/:id", wrapAsync(async (req,res,next) => {
+        const {id} = req.params
+        const product = await Product.findByIdAndUpdate(id, req.body, {runValidators: true});
+        res.redirect(`/product/${product.id}`)
+}))
 
 //Route untuk delete produk
-app.delete("/product/:id", async (req,res) => {
+app.delete("/product/:id", wrapAsync(async (req,res) => {
     const {id} = req.params;
     await Product.findByIdAndDelete(id);
     res.redirect("/product");
+}))
+
+app.use((err,req,res,next) => {
+    console.dir(err)
+    next(err);
 })
 
+//mengisi value dari class errorHandler
+app.use((err,req,res,next) => {
+    //value default
+    const {status = 500, message = "Something went wrong"} = err;
+    //ini yang akan di isi nantinya
+    res.status(status).send(`Produk Tidak Di temukan : ${message}`);
+})
 
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
