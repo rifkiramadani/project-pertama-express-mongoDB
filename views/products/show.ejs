@@ -17,6 +17,12 @@
             <%= product.category %></a>
         </li>
     </ul>
+    <h2>Garment: </h2>
+    <ul>
+        <li>
+            <a href="/garment/<%= product.garment[0].id %>"><%= product.garment[0].name %></a>
+        </li>
+    </ul>
     <a href="/product/<%= product.id %>/edit">Edit Product</a><br>
     <a href="/product"><< Kembali ke semua Product</a>
     <form action="/product/<%= product.id %>?_method=delete" method="post">

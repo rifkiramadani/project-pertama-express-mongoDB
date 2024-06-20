@@ -9,6 +9,7 @@ const errorHandler = require('./errorHandler');
 
 // MODELS //panggil model yang telah di exports
 const Product = require("./models/product");
+const Garment = require("./models/garment");
 
 //Koneksi ke mongoDB dengan database shop_db
 mongoose.connect('mongodb://127.0.0.1:27017/shop_db').then((result) => {
@@ -38,6 +39,65 @@ app.get('/', (req,res) => {
     res.send("Terhubung cik");
 })
 
+//ROUTE GARMENT
+//Route untuk menmapilkan data garmennt
+app.get('/garment', wrapAsync(async (req,res) => {
+    const garment = await Garment.find({});
+    res.render("garment/index.ejs", {
+        garments: garment
+    });
+}));
+
+//Route untuk menampilkan form input atau create garment
+app.get('/garment/create', (req,res) => {
+    res.render('garment/create.ejs');
+})
+
+//Route untuk menyimpan data garment
+app.post('/garment', wrapAsync(async (req,res) => {
+    const garment = new Garment(req.body);
+    await garment.save();
+    res.redirect('/garment');
+}));
+
+//Route untuk show detail garment
+app.get('/garment/:id', wrapAsync(async (req,res) => {
+    const {id} = req.params;
+    const garment = await Garment.findById(id).populate('products');
+    res.render('garment/show.ejs', {
+        garment: garment
+    })
+}))
+
+//Route untuk menampilkan form input data produk ke garment
+app.get('/garment/:garment_id/product/create', wrapAsync(async(req,res) => {
+    const {garment_id} = req.params;
+    res.render('products/create',{
+        garment_id
+    });
+}));
+
+//Route untuk menyimpan data produk ke dalam garment
+app.post('/garment/:garment_id/product', wrapAsync(async(req,res) => {
+    const {garment_id} = req.params;
+    const garment = await Garment.findById(garment_id);
+    const product = new Product(req.body);
+    garment.products.push(product);
+    product.garment = garment;
+    await garment.save();
+    await product.save();
+    res.redirect(`/garment/${garment_id}`);
+}))
+
+//Route untuk menghapus data garment
+app.delete('/garment/:garment_id', wrapAsync(async (req,res) => {
+    const {garment_id} = req.params;
+    await Garment.findOneAndDelete({_id: garment_id});
+    res.redirect('/garment');
+}))
+
+
+//ROUTE PRODUCT
 //Route untuk menampilkan product
 app.get('/product', async (req,res) => {
     //menampilkan category jika category ada atau benar
@@ -83,10 +143,11 @@ app.post("/product", async (req,res) => {
 //Route untuk menampilkan detail product cara pertama menggunakan function wrapAsync yang telah di buat di atas
 app.get("/product/:id", wrapAsync(async (req,res,next) => {
         const {id} = req.params
-        const product = await Product.findById(id);
+        const product = await Product.findById(id).populate('garment');
         res.render("products/show.ejs", {
             product: product
         });
+        // res.send(product)
 }));
 
 //Route untuk menampilkan detail product cara kedua yang menggunakan try and catch secara langsung
@@ -138,7 +199,7 @@ app.use((err,req,res,next) => {
     //value default
     const {status = 500, message = "Something went wrong"} = err;
     //ini yang akan di isi nantinya
-    res.status(status).send(`Produk Tidak Di temukan : ${message}`);
+    res.status(status).send(`${message}`);
 })
 
 app.listen(port, () => {
