@@ -4,6 +4,10 @@ const mongoose = require('mongoose');
 const methodOverride = require('method-override');
 const port = 3000;
 
+//mengimport session dan session flash
+const session = require('express-session');
+const flash = require('connect-flash');
+
 //mengimport file errorHandler
 const errorHandler = require('./errorHandler');
 
@@ -18,14 +22,28 @@ mongoose.connect('mongodb://127.0.0.1:27017/shop_db').then((result) => {
     console.log(err)
 })
 
+//DEFINE MIDDLEWARE
 //mengaktifkan templating ejs
 app.set("view engine", "ejs");
-
 //mengaktifkan urlencoded agar body.request dapat di ambil oleh express
 app.use(express.urlencoded({extended: true}));
-
 //mengaktifkan method override
 app.use(methodOverride("_method"));
+//mengaktifkan session
+app.use(session({
+    secret: 'secret-key',
+    resave: false,
+    saveUninitialized: true,
+}))
+//mengaktifkan session flash atau connect flash
+app.use(flash());
+//membuat middleware untuk variable global yang dimana agar session flash bisa di gunakan di seluruh halaaman atau tidak perlu mendeklarasikan nya satu persatu
+app.use((req,res,next) => {
+    //menggunakan res.locals agar bisa digunakan di semua route atau halaman
+    res.locals.flash_message = req.flash('flash_message');
+    next();
+})
+
 
 //membuat blueprint untuk try and catch handling error
 function wrapAsync(fn) {
@@ -57,6 +75,7 @@ app.get('/garment/create', (req,res) => {
 app.post('/garment', wrapAsync(async (req,res) => {
     const garment = new Garment(req.body);
     await garment.save();
+    req.flash('flash_message', 'Berhasil Menambahkan Data Pabrik!');
     res.redirect('/garment');
 }));
 
